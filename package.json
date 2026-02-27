@@ -17,3 +17,6 @@
     "neo4j-driver": "^6.0.1"
   }
 }
+"scripts": {
+  "start": "node index.js"
+}
