@@ -23,6 +23,3 @@
     "openai": "^6.25.0"
   }
 }
-"scripts": {
-  "start": "node index.js"
-}
