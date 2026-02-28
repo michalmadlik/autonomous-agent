@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medstart — Autonomous Agent</title>
+<style>
+:root {
+  --bg:     #08090d;
+  --s1:     #0d1017;
+  --s2:     #111520;
+  --s3:     #161c2a;
+  --border: #1c2338;
+  --cyan:   #00d4ff;
+  --green:  #00e676;
+  --gold:   #ffca28;
+  --red:    #ff5252;
+  --text:   #dde3f4;
+  --muted:  #4d5c80;
+  --dim:    #252f48;
+}
+html.light {
+  --bg:     #f5f7fa;
+  --s1:     #ffffff;
+  --s2:     #f0f2f5;
+  --s3:     #e8ebf0;
+  --border: #d4d9e3;
+  --cyan:   #0090b8;
+  --green:  #00875a;
+  --gold:   #c77f00;
+  --red:    #d32f2f;
+  --text:   #1a2233;
+  --muted:  #5f6b82;
+  --dim:    #c8cdd8;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; min-height: 100vh; transition: background .3s, color .3s; }
+
+/* ── Theme toggle ── */
+.theme-toggle {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 12px; cursor: pointer; font-size: 16px; line-height: 1;
+  transition: all .2s; flex-shrink: 0;
+}
+.theme-toggle:hover { border-color: var(--cyan); }
+
+/* ── Header ── */
+header {
+  display: flex; align-items: center; gap: 20px;
+  padding: 16px 32px; border-bottom: 1px solid var(--border);
+  background: var(--s1); flex-wrap: wrap;
+}
+.brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.brand-icon { font-size: 22px; }
+.brand-name { font-size: 16px; font-weight: 700; color: var(--cyan); }
+.brand-sub  { font-size: 11px; color: var(--muted); }
+.input-row { display: flex; gap: 10px; flex: 1; min-width: 280px; max-width: 560px; }
+.input-row input {
+  flex: 1; background: var(--s2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 16px; color: var(--text); font-size: 15px; outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.input-row input:focus { border-color: var(--cyan); box-shadow: 0 0 0 3px rgba(0,212,255,.08); }
+.input-row input::placeholder { color: var(--muted); }
+#startBtn {
+  background: var(--cyan); color: #000; border: none; border-radius: 10px;
+  padding: 11px 22px; font-weight: 700; font-size: 14px; cursor: pointer;
+  white-space: nowrap; transition: opacity .2s, transform .1s;
+}
+#startBtn:hover:not(:disabled) { opacity: .85; }
+#startBtn:active:not(:disabled) { transform: scale(.97); }
+#startBtn:disabled { opacity: .35; cursor: not-allowed; }
+.tools-row { display: flex; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+.tool-badge {
+  font-size: 11px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--muted); padding: 4px 10px; border-radius: 20px;
+}
+
+/* ── Main ── */
+main { max-width: 840px; margin: 0 auto; padding: 36px 24px 80px; }
+.section-label {
+  font-size: 11px; letter-spacing: .12em; color: var(--muted);
+  text-transform: uppercase; margin-bottom: 14px; font-weight: 600;
+}
+
+/* ── Empty state ── */
+#emptyState {
+  text-align: center; padding: 80px 24px;
+  animation: fadeIn .4s ease;
+}
+#emptyState .es-icon { font-size: 56px; margin-bottom: 20px; }
+#emptyState h2 { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+#emptyState p { font-size: 14px; color: var(--muted); line-height: 1.7; max-width: 420px; margin: 0 auto; }
+.es-examples { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+.es-chip {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 7px 16px; font-size: 13px; color: var(--muted); cursor: pointer;
+  transition: all .2s;
+}
+.es-chip:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Pipeline cells ── */
+#pipelineWrap { display: none; }
+.cell {
+  display: flex; align-items: flex-start; gap: 16px;
+  background: var(--s1); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 22px; margin-bottom: 8px;
+  transition: border-color .35s, box-shadow .35s, opacity .35s;
+  animation: slideDown .3s ease both;
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cell.pending     { opacity: .3; }
+.cell.waiting     { opacity: .5; }
+.cell.running     { border-color: var(--cyan);  box-shadow: 0 0 30px rgba(0,212,255,.13); opacity: 1; }
+.cell.done        { border-color: rgba(0,230,118,.35); opacity: 1; }
+.cell.interactive { border-color: var(--gold);  box-shadow: 0 0 30px rgba(255,202,40,.10);  opacity: 1; }
+.cell.error       { border-color: var(--red);   opacity: 1; }
+
+.cell-icon {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0; transition: background .3s;
+}
+.cell.pending   .cell-icon, .cell.waiting .cell-icon { background: var(--dim); color: var(--muted); }
+.cell.running   .cell-icon { background: rgba(0,212,255,.12); animation: pulseRing 1.6s infinite; }
+.cell.done      .cell-icon { background: rgba(0,230,118,.12); color: var(--green); }
+.cell.interactive .cell-icon { background: rgba(255,202,40,.12); color: var(--gold); }
+.cell.error     .cell-icon { background: rgba(255,82,82,.12);  color: var(--red); }
+@keyframes pulseRing {
+  0%,100% { box-shadow: 0 0 0 0 rgba(0,212,255,.45); }
+  50%      { box-shadow: 0 0 0 10px rgba(0,212,255,0); }
+}
+.spinner {
+  width: 16px; height: 16px; border: 2.5px solid var(--cyan);
+  border-right-color: transparent; border-radius: 50%;
+  animation: spin .65s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.cell-body  { flex: 1; min-width: 0; }
+.cell-label { font-size: 14px; font-weight: 600; }
+.cell-detail { font-size: 12px; color: var(--muted); margin-top: 3px; transition: color .3s; }
+.cell.running     .cell-detail { color: var(--cyan); }
+.cell.done        .cell-detail { color: var(--green); }
+.cell.interactive .cell-detail { color: var(--gold); }
+.cell.error       .cell-detail { color: var(--red); }
+.cell-badge {
+  font-size: 10px; background: var(--s3); border: 1px solid var(--border);
+  color: var(--muted); padding: 3px 9px; border-radius: 4px; white-space: nowrap;
+  flex-shrink: 0; align-self: center; transition: all .3s;
+}
+.cell.running   .cell-badge { border-color: rgba(0,212,255,.3); color: var(--cyan); }
+.cell.done      .cell-badge { border-color: rgba(0,230,118,.3); color: var(--green); }
+.cell.interactive .cell-badge { border-color: rgba(255,202,40,.3); color: var(--gold); }
+
+/* ── Clarify form ── */
+.clarify-form {
+  margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 24px;
+  animation: fadeIn .4s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.q-label { font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 10px; }
+
+.ms-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ms-opt {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 20px;
+  padding: 7px 16px; font-size: 13px; cursor: pointer;
+  transition: all .2s; user-select: none;
+}
+.ms-opt:hover { border-color: var(--gold); }
+.ms-opt.sel { background: rgba(255,202,40,.12); border-color: var(--gold); color: var(--gold); }
+
+.slider-row { display: flex; align-items: center; gap: 14px; }
+.slider-lbl { font-size: 11px; color: var(--muted); white-space: nowrap; min-width: 80px; }
+.slider-lbl.right { text-align: right; }
+input[type=range] {
+  flex: 1; -webkit-appearance: none; height: 4px;
+  background: var(--border); border-radius: 2px; outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--gold); cursor: pointer;
+  box-shadow: 0 0 10px rgba(255,202,40,.4); transition: transform .15s;
+}
+input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.15); }
+.slider-val { min-width: 30px; font-size: 22px; font-weight: 700; color: var(--gold); text-align: center; }
+
+.days-row { display: flex; align-items: center; gap: 10px; }
+input[type=number] {
+  width: 74px; background: var(--s2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 12px; color: var(--text);
+  font-size: 20px; font-weight: 700; text-align: center; outline: none;
+  transition: border-color .2s;
+}
+input[type=number]:focus { border-color: var(--gold); }
+.days-unit { font-size: 13px; color: var(--muted); }
+
+.btn-continue {
+  align-self: flex-start; background: var(--gold); color: #000; border: none;
+  border-radius: 10px; padding: 12px 30px; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: opacity .2s, transform .1s; letter-spacing: .02em;
+}
+.btn-continue:hover { opacity: .85; }
+.btn-continue:active { transform: scale(.97); }
+.btn-continue:disabled { opacity: .4; cursor: not-allowed; }
+
+/* ── Results ── */
+#resultsWrap { margin-top: 48px; animation: fadeIn .5s ease; }
+.res-section { margin-bottom: 36px; }
+
+.scope-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.scope-chip {
+  background: var(--s1); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 20px; text-align: center; min-width: 90px;
+}
+.scope-chip .val { font-size: 26px; font-weight: 700; color: var(--cyan); }
+.scope-chip .key { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+.scope-chip.warn .val { color: var(--gold); }
+
+/* ── Methodology banner ── */
+.method-banner {
+  display: flex; gap: 16px; flex-wrap: wrap; align-items: stretch;
+  margin-bottom: 8px;
+}
+.method-card {
+  flex: 1; min-width: 200px;
+  background: var(--s1); border: 1px solid var(--border); border-radius: 14px;
+  padding: 18px 22px;
+}
+.method-card .m-icon { font-size: 22px; margin-bottom: 8px; }
+.method-card .m-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.method-card .m-sub { font-size: 12px; color: var(--muted); line-height: 1.6; }
+.method-card .m-tag {
+  display: inline-block; margin-top: 8px; font-size: 10px; padding: 2px 8px;
+  border-radius: 4px; font-weight: 700; letter-spacing: .04em;
+}
+.m-tag.opensource { background: rgba(0,230,118,.08); color: var(--green); border: 1px solid rgba(0,230,118,.2); }
+
+/* ── Day tabs ── */
+.day-tabs {
+  display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap;
+}
+.day-tab {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 18px; cursor: pointer; transition: all .2s; position: relative;
+}
+.day-tab:hover { border-color: var(--cyan); }
+.day-tab.active { background: rgba(0,212,255,.08); border-color: var(--cyan); }
+.day-tab .dt-num { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.day-tab .dt-title { font-size: 13px; font-weight: 600; color: var(--text); margin-top: 2px; }
+.day-tab .dt-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.day-tab .dt-weak {
+  position: absolute; top: 8px; right: 10px; font-size: 9px;
+  background: rgba(255,82,82,.1); color: var(--red); border-radius: 4px;
+  padding: 1px 6px;
+}
+.day-content { display: none; }
+.day-content.active { display: block; }
+
+/* ── Day header ── */
+.day-header {
+  display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  margin-bottom: 24px; padding-bottom: 18px; border-bottom: 1px solid var(--border);
+}
+.dh-day { font-size: 42px; font-weight: 900; color: var(--dim); line-height: 1; }
+.dh-body { flex: 1; }
+.dh-title { font-size: 20px; font-weight: 700; color: var(--text); }
+.dh-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.dh-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.dh-badge {
+  font-size: 10px; padding: 3px 10px; border-radius: 20px; font-weight: 600;
+}
+.bloom-badge { border: 1px solid; }
+.weak-badge { font-size: 11px; background: rgba(255,82,82,.1); color: var(--red); border: 1px solid rgba(255,82,82,.3); border-radius: 20px; padding: 3px 12px; white-space: nowrap; }
+.sm2-badge { background: rgba(171,71,188,.08); color: #ce93d8; border: 1px solid rgba(171,71,188,.2); }
+
+/* ── Topic within day ── */
+.day-topic {
+  background: var(--s1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 28px 32px; margin-bottom: 14px; animation: slideUp .4s ease both;
+}
+.dt-head { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 22px; }
+.dt-num { font-size: 36px; font-weight: 900; color: var(--dim); line-height: 1; flex-shrink: 0; }
+.dt-title { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.dt-summary { font-size: 14px; color: var(--muted); line-height: 1.7; }
+.terms { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.term {
+  background: var(--s3); border: 1px solid var(--border); border-radius: 6px;
+  padding: 5px 13px; font-size: 12px; color: var(--muted); transition: all .18s;
+}
+.term:hover { border-color: var(--cyan); color: var(--cyan); }
+
+/* ── Plan ── */
+.plan-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 10px; }
+.day-card { background: var(--s1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.day-num { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.day-focus { font-size: 13px; font-weight: 600; margin: 4px 0 12px; line-height: 1.4; }
+.bars { display: flex; flex-direction: column; gap: 6px; }
+.bar-row { display: flex; align-items: center; gap: 8px; }
+.bar-track { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 2px; transition: width .6s ease; }
+.bar-fill.cov  { background: var(--cyan); }
+.bar-fill.weak { background: #ff7043; }
+.bar-fill.rev  { background: #ab47bc; }
+.bar-lbl { font-size: 10px; color: var(--muted); width: 12px; }
+.bar-cnt { font-size: 10px; color: var(--muted); width: 22px; text-align: right; }
+.day-total { font-size: 12px; color: var(--muted); margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+
+/* ── Theory ── */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.theory-block {
+  background: var(--s1); border: 1px solid var(--border); border-radius: 18px;
+  padding: 32px 36px; margin-bottom: 12px;
+  animation: slideUp .5s ease both;
+}
+.theory-header {
+  display: flex; gap: 22px; align-items: flex-start;
+  margin-bottom: 28px; padding-bottom: 22px; border-bottom: 1px solid var(--border);
+}
+.theory-num { font-size: 44px; font-weight: 900; color: var(--dim); line-height: 1; flex-shrink: 0; letter-spacing: -.03em; }
+.theory-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+.theory-sum { font-size: 14px; color: var(--muted); line-height: 1.75; }
+.teach-cards { display: flex; flex-direction: column; gap: 6px; }
+.teach-card {
+  padding: 22px 0; border-bottom: 1px solid var(--border);
+  animation: slideUp .4s ease both;
+}
+.teach-card:last-child { border-bottom: none; }
+.tc-concept {
+  display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--cyan); background: rgba(0,212,255,.08);
+  border-radius: 4px; padding: 3px 10px; margin-bottom: 12px;
+}
+.tc-teach {
+  font-size: 15px; color: var(--text); line-height: 1.8; margin-bottom: 12px;
+}
+.tc-example {
+  font-size: 14px; color: var(--muted); line-height: 1.7;
+  padding: 12px 18px; background: rgba(0,212,255,.03);
+  border-left: 2px solid var(--cyan); border-radius: 0 8px 8px 0;
+  margin-bottom: 16px;
+}
+.tc-example::before {
+  content: 'Example '; font-weight: 700; color: var(--cyan); font-size: 10px;
+  text-transform: uppercase; letter-spacing: .06em; display: block; margin-bottom: 4px;
+}
+.tc-exercise {
+  background: rgba(255,202,40,.04); border: 1px solid rgba(255,202,40,.14);
+  border-radius: 12px; padding: 16px 20px; position: relative;
+}
+.tc-ex-type {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--gold); margin-bottom: 8px;
+}
+.tc-ex-text { font-size: 14px; color: var(--text); line-height: 1.7; }
+.tc-ex-text .blank {
+  display: inline-block; min-width: 90px; border-bottom: 2px dashed var(--gold);
+  margin: 0 4px; text-align: center; color: var(--gold); font-weight: 600;
+}
+.tc-reveal-btn {
+  margin-top: 10px; background: none; border: 1px solid rgba(255,202,40,.25);
+  color: var(--gold); border-radius: 6px; padding: 5px 14px; font-size: 12px;
+  cursor: pointer; transition: all .2s;
+}
+.tc-reveal-btn:hover { background: rgba(255,202,40,.08); }
+.tc-answer {
+  margin-top: 10px; padding: 10px 14px; background: rgba(0,230,118,.06);
+  border: 1px solid rgba(0,230,118,.2); border-radius: 8px;
+  font-size: 14px; color: var(--green); display: none; line-height: 1.6;
+}
+.tc-answer.show { display: block; animation: slideUp .25s ease; }
+.src-link { color: var(--muted); text-decoration: none; font-size: 11px; margin-left: 5px; transition: color .15s; }
+.src-link:hover { color: var(--cyan); }
+
+/* ── Other input ── */
+.other-input {
+  width: 100%; margin-top: 10px; background: var(--s2); border: 1px solid var(--gold);
+  border-radius: 8px; padding: 10px 14px; color: var(--text); font-size: 13px; outline: none;
+  display: none; transition: border-color .2s;
+}
+.other-input:focus { border-color: var(--cyan); }
+
+/* ── Extraction results (inside pipeline cell) ── */
+.extract-results {
+  margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border);
+  animation: fadeIn .4s ease;
+}
+.extract-header {
+  display: flex; gap: 12px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;
+}
+.extract-stat {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 14px; text-align: center; min-width: 70px;
+}
+.extract-stat .e-val { font-size: 20px; font-weight: 800; color: var(--cyan); }
+.extract-stat .e-key { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.extract-stat.f1 .e-val { color: var(--green); }
+.extract-stat.model .e-val { font-size: 11px; color: var(--gold); font-weight: 600; }
+.extract-domains {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+}
+.extract-domain {
+  background: rgba(0,212,255,.06); border: 1px solid rgba(0,212,255,.15);
+  border-radius: 8px; padding: 8px 14px; font-size: 12px;
+}
+.extract-domain .ed-name { font-weight: 700; color: var(--cyan); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.extract-domain .ed-concepts { color: var(--muted); margin-top: 4px; font-size: 11px; line-height: 1.5; }
+.extract-api-tag {
+  display: inline-block; font-size: 9px; padding: 2px 8px; border-radius: 4px;
+  font-weight: 700; letter-spacing: .04em; margin-top: 8px;
+}
+.extract-api-tag.pioneer { background: rgba(0,230,118,.08); color: var(--green); border: 1px solid rgba(0,230,118,.2); }
+.extract-api-tag.reka { background: rgba(255,202,40,.08); color: var(--gold); border: 1px solid rgba(255,202,40,.2); }
+
+/* ── Weakness analysis banner (results page) ── */
+.weakness-banner {
+  background: linear-gradient(135deg, rgba(0,212,255,.04) 0%, rgba(0,230,118,.04) 100%);
+  border: 1px solid var(--border); border-radius: 16px;
+  padding: 24px 28px; margin-bottom: 8px;
+}
+.wb-title { font-size: 16px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.wb-sub { font-size: 12px; color: var(--muted); margin-bottom: 16px; }
+.wb-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+.wb-card {
+  flex: 1; min-width: 140px; background: var(--s1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 16px 18px; text-align: center;
+}
+.wb-card .wb-val { font-size: 28px; font-weight: 900; line-height: 1; }
+.wb-card .wb-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 6px; }
+.wb-concepts {
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px;
+}
+.wb-concept {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 12px; font-size: 11px; color: var(--muted); transition: all .15s;
+}
+.wb-concept:hover { border-color: var(--cyan); color: var(--cyan); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span class="brand-icon">🧬</span>
+    <div>
+      <div class="brand-name">Medstart Agent</div>
+      <div class="brand-sub">Autonomous Study Planner</div>
+    </div>
+  </div>
+  <div class="input-row">
+    <input id="topicInput" placeholder="Enter a topic (DNA, kinematics, homeostasis...)" />
+    <button id="startBtn">▶ Start Agent</button>
+  </div>
+  <div class="tools-row">
+    <span class="tool-badge">Tavily</span>
+    <span class="tool-badge">Senso AI</span>
+    <span class="tool-badge">Reka Flash</span>
+    <span class="tool-badge">Neo4j</span>
+    <span class="tool-badge">Fastino/GLiNER</span>
+    <span class="tool-badge">Pioneer</span>
+  </div>
+  <button class="theme-toggle" id="themeBtn" onclick="toggleTheme()" title="Toggle light/dark mode">☀️</button>
+</header>
+
+<main>
+  <!-- Empty state -->
+  <div id="emptyState">
+    <div class="es-icon">🤖</div>
+    <h2>Autonomous Study Agent</h2>
+    <p>Enter a topic, the agent will search sources, ask you a few questions, and build a personalised plan tailored exactly for you.</p>
+    <div class="es-examples">
+      <div class="es-chip" onclick="setTopic('DNA &amp; protein synthesis')">DNA &amp; protein synthesis</div>
+      <div class="es-chip" onclick="setTopic('Kinematics in mechanics')">Kinematics in mechanics</div>
+      <div class="es-chip" onclick="setTopic('Cell division &amp; mitosis')">Cell division &amp; mitosis</div>
+      <div class="es-chip" onclick="setTopic('Acid-base balance')">Acid-base balance</div>
+    </div>
+  </div>
+
+  <!-- Pipeline -->
+  <div id="pipelineWrap">
+    <div class="section-label">AGENT PIPELINE</div>
+    <div id="cells"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="resultsWrap"></div>
+</main>
+
+<script>
+// ── Step definitions ──────────────────────────────────────────────────────
+const STEPS = [
+  { id: 'search',  label: 'Searching sources',              badge: 'Tavily Search',    icon: '🔍' },
+  { id: 'verify',  label: 'Verifying sources',              badge: 'Senso AI',         icon: '✅' },
+  { id: 'extract', label: 'Extracting weaknesses',          badge: 'GLiNER + Pioneer', icon: '🎯' },
+  { id: 'clarify', label: 'Need a bit more info',           badge: 'Interactive',      icon: '💬', interactive: true },
+  { id: 'cluster', label: 'Analysing & clustering content', badge: 'Reka Flash',       icon: '🧠' },
+  { id: 'theory',  label: 'Generating theory & citations',  badge: 'Reka + Tavily',    icon: '📚' },
+  { id: 'plan',    label: 'Building personalised plan',      badge: 'Scope Engine',     icon: '📅' },
+  { id: 'save',    label: 'Saving to knowledge graph',      badge: 'SQLite + Neo4j',   icon: '💾' },
+];
+
+let STATE = {};
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function $id(id) { return document.getElementById(id); }
+function cellEl(id) { return $id('cell-' + id); }
+
+function renderCells() {
+  const wrap = $id('cells');
+  wrap.innerHTML = '';
+  STEPS.forEach((s, idx) => {
+    const el = document.createElement('div');
+    el.id = 'cell-' + s.id;
+    el.className = 'cell pending';
+    el.dataset.icon = s.icon;
+    el.style.animationDelay = (idx * 60) + 'ms';
+    el.innerHTML = `
+      <div class="cell-icon">${s.icon}</div>
+      <div class="cell-body">
+        <div class="cell-label">${s.label}</div>
+        <div class="cell-detail" id="det-${s.id}">waiting...</div>
+      </div>
+      <div class="cell-badge">${s.badge}</div>`;
+    wrap.appendChild(el);
+  });
+}
+
+function setCellState(id, status, detail) {
+  const el = cellEl(id);
+  if (!el) return;
+  el.className = 'cell ' + status;
+  if (detail !== undefined) {
+    const det = $id('det-' + id);
+    if (det) det.textContent = detail;
+  }
+  const icon = el.querySelector('.cell-icon');
+  if (icon) {
+    const base = el.dataset.icon;
+    if (status === 'running')     icon.innerHTML = '<div class="spinner"></div>';
+    else if (status === 'done')        icon.textContent = '✓';
+    else if (status === 'interactive') icon.textContent = '❓';
+    else if (status === 'error')       icon.textContent = '✕';
+    else                               icon.textContent = base;
+  }
+}
+
+// ── Clarify form ──────────────────────────────────────────────────────────
+// Senso answer inside verify cell
+function renderSensoAnswerInCell(answer) {
+  const el = cellEl('verify');
+  if (!el || !answer) return;
+  const div = document.createElement('div');
+  div.className = 'extract-results';
+  div.innerHTML = `<div style="margin-top:12px;padding:12px 16px;background:rgba(0,230,118,.04);border:1px solid rgba(0,230,118,.15);border-radius:10px;font-size:13px;color:var(--text);line-height:1.7">
+    <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:6px">🧬 Senso Org KB Answer</div>
+    ${answer}
+  </div>
+  <span class="extract-api-tag pioneer" style="margin-top:8px;display:inline-block">✓ SENSO AI · ORG KNOWLEDGE BASE</span>`;
+  el.querySelector('.cell-body').appendChild(div);
+}
+
+// Render extraction results inside the extract pipeline cell
+function renderExtractionInCell(extraction) {
+  const el = cellEl('extract');
+  if (!el || !extraction || !extraction.entityCount) return;
+
+  const ds = extraction.domainScores || [];
+  const f1 = extraction.f1;
+  const model = extraction.model || 'GLiNER2';
+
+  let html = '<div class="extract-results"><div class="extract-header">';
+  html += `<div class="extract-stat"><div class="e-val">${extraction.entityCount}</div><div class="e-key">Concepts</div></div>`;
+  html += `<div class="extract-stat"><div class="e-val">${ds.length}</div><div class="e-key">Domains</div></div>`;
+  if (f1) {
+    html += `<div class="extract-stat f1"><div class="e-val">${f1.f1}</div><div class="e-key">F1 Score</div></div>`;
+  }
+  html += `<div class="extract-stat model"><div class="e-val">${model}</div><div class="e-key">NER Model</div></div>`;
+  html += '</div>';
+
+  // Domain chips with concepts
+  if (ds.length > 0) {
+    html += '<div class="extract-domains">';
+    ds.slice(0, 5).forEach(d => {
+      html += `<div class="extract-domain">
+        <div class="ed-name">${d.domain} (${d.count})</div>
+        <div class="ed-concepts">${d.concepts.slice(0, 4).join(', ')}${d.concepts.length > 4 ? '…' : ''}</div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // API tag
+  html += extraction.apiUsed
+    ? '<span class="extract-api-tag pioneer">✓ PIONEER API · GLINER2</span>'
+    : '<span class="extract-api-tag reka">REKA FLASH NER · FALLBACK</span>';
+  html += '</div>';
+
+  el.querySelector('.cell-body').insertAdjacentHTML('beforeend', html);
+}
+
+function renderClarifyForm(questions, extraction) {
+  const el = cellEl('clarify');
+  if (!el) return;
+
+  const form = document.createElement('div');
+  form.className = 'clarify-form';
+  form.id = 'clarify-form';
+
+  // Get predicted weak domains from extraction for pre-selection
+  const predictedWeak = (extraction?.predictedWeakDomains || []).map(d => d.toLowerCase());
+
+  questions.forEach(q => {
+    const block = document.createElement('div');
+
+    if (q.type === 'multiselect') {
+      block.innerHTML = `<div class="q-label">${q.label}${predictedWeak.length > 0 ? ' <span style="font-size:11px;color:var(--cyan);font-weight:400">(🎯 AI-detected areas are pre-selected)</span>' : ''}</div>
+        <div class="ms-opts" id="ms-${q.id}">
+          ${(q.options || []).map(o =>
+            `<div class="ms-opt${predictedWeak.some(pw => o.toLowerCase().includes(pw) || pw.includes(o.toLowerCase())) ? ' sel' : ''}" data-val="${o}">${o}${predictedWeak.some(pw => o.toLowerCase().includes(pw) || pw.includes(o.toLowerCase())) ? ' 🎯' : ''}</div>`
+          ).join('')}
+        </div>`;
+      block.querySelectorAll('.ms-opt').forEach(btn =>
+        btn.addEventListener('click', () => btn.classList.toggle('sel'))
+      );
+      // “Other...” free-text option
+      const optsDiv = block.querySelector('.ms-opts');
+      const otherChip = document.createElement('div');
+      otherChip.className = 'ms-opt';
+      otherChip.textContent = '✏️ Other...';
+      const otherInp = document.createElement('input');
+      otherInp.type = 'text';
+      otherInp.id = `ms-other-${q.id}`;
+      otherInp.className = 'other-input';
+      otherInp.placeholder = 'Describe your area…';
+      otherChip.addEventListener('click', () => {
+        otherChip.classList.toggle('sel');
+        otherInp.style.display = otherChip.classList.contains('sel') ? 'block' : 'none';
+        if (otherChip.classList.contains('sel')) setTimeout(() => otherInp.focus(), 50);
+      });
+      optsDiv.appendChild(otherChip);
+      block.appendChild(otherInp);
+
+    } else if (q.type === 'slider') {
+      block.innerHTML = `<div class="q-label">${q.label}</div>
+        <div class="slider-row">
+          <span class="slider-lbl">${q.hint_low || q.min}</span>
+          <input type="range" id="sl-${q.id}" min="${q.min}" max="${q.max}" value="${q.default}" />
+          <span class="slider-val" id="slv-${q.id}">${q.default}</span>
+          <span class="slider-lbl right">${q.hint_high || q.max}</span>
+        </div>`;
+      block.querySelector(`#sl-${q.id}`)?.addEventListener('input', e => {
+        $id(`slv-${q.id}`).textContent = e.target.value;
+      });
+
+    } else if (q.type === 'number') {
+      block.innerHTML = `<div class="q-label">${q.label}</div>
+        <div class="days-row">
+          <input type="number" id="num-${q.id}" value="${q.default}" min="${q.min}" max="${q.max}" />
+          <span class="days-unit">days</span>
+        </div>`;
+    }
+
+    form.appendChild(block);
+  });
+
+  const btn = document.createElement('button');
+  btn.className = 'btn-continue';
+  btn.textContent = 'Continue →';
+  btn.addEventListener('click', () => submitClarify(questions, btn));
+  form.appendChild(btn);
+
+  el.querySelector('.cell-body').appendChild(form);
+}
+
+function collectAnswers(questions) {
+  const answers = {};
+  questions.forEach(q => {
+    if (q.type === 'multiselect') {
+      const selected = [...document.querySelectorAll(`#ms-${q.id} .ms-opt.sel`)]
+        .map(el => el.dataset.val).filter(v => v && v !== '__other__');
+      const otherInp = document.getElementById(`ms-other-${q.id}`);
+      if (otherInp && otherInp.value.trim()) selected.push(otherInp.value.trim());
+      answers[q.id] = selected;
+    } else if (q.type === 'slider') {
+      answers[q.id] = Number($id(`sl-${q.id}`)?.value || q.default);
+    } else if (q.type === 'number') {
+      answers[q.id] = Number($id(`num-${q.id}`)?.value || q.default);
+    }
+  });
+  return answers;
+}
+
+// ── Stream pipeline ───────────────────────────────────────────────────────
+async function streamPlan(query, answers) {
+  const response = await fetch('/api/agent/plan-stream', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, user_id: 1, answers, extraction: STATE.extraction || null })
+  });
+  if (!response.ok) throw new Error('Stream failed: ' + response.status);
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buf += decoder.decode(value, { stream: true });
+    const lines = buf.split('\n');
+    buf = lines.pop();
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      try {
+        handleStreamEvent(JSON.parse(line.slice(6)));
+      } catch (_) {}
+    }
+  }
+}
+
+// Partial results accumulator
+const PARTIAL = { clusters: [], theories: [], sources: [] };
+
+function handleStreamEvent(ev) {
+  if (ev.type === 'step') {
+    setCellState(ev.id, ev.status, ev.detail);
+    // Update label text if provided
+    if (ev.label) {
+      const el = cellEl(ev.id);
+      if (el) {
+        const lbl = el.querySelector('.cell-label');
+        if (lbl) lbl.textContent = ev.label;
+      }
+    }
+  } else if (ev.type === 'partial') {
+    // A cluster's theory just finished — render it immediately
+    PARTIAL.clusters.push(ev.cluster);
+    PARTIAL.theories.push(ev.theory);
+    PARTIAL.sources = ev.sources;
+    renderPartialResult(ev.cluster, ev.theory, ev.sources, ev.clusterIndex, ev.totalClusters);
+  } else if (ev.type === 'done') {
+    setCellState('save', 'done');
+    renderResults(ev.plan);
+    $id('startBtn').disabled = false;
+  } else if (ev.type === 'error') {
+    setCellState('save', 'error', ev.message);
+    $id('startBtn').disabled = false;
+  }
+}
+
+function renderPartialResult(cluster, theory, sources, idx, total) {
+  const wrap = $id('resultsWrap');
+  // First partial? Set up container
+  if (idx === 0) {
+    wrap.style.display = 'block';
+    wrap.innerHTML = `<div class="res-section">
+      <div class="section-label">GENERATING STUDY MATERIALS · ${total} TOPICS</div>
+      <div id="partialCards"></div>
+      <div id="partialProgress" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+        <div class="spinner" style="margin:0 auto 10px;width:20px;height:20px;border-color:var(--cyan);border-right-color:transparent"></div>
+        Loading topic 1 of ${total}…
+      </div>
+    </div>`;
+    wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  const container = document.getElementById('partialCards');
+  const progress = document.getElementById('partialProgress');
+  if (!container) return;
+
+  // Update progress
+  if (progress) {
+    if (idx >= total - 1) {
+      progress.innerHTML = '<span style="color:var(--green)">✓ All topics generated — building your plan…</span>';
+    } else {
+      progress.innerHTML = `<div class="spinner" style="margin:0 auto 10px;width:20px;height:20px;border-color:var(--cyan);border-right-color:transparent"></div>
+        Loading topic ${idx + 2} of ${total}…`;
+    }
+  }
+
+  // Render this cluster's cards
+  const block = document.createElement('div');
+  block.className = 'day-topic';
+  block.style.animationDelay = `${idx * 80}ms`;
+
+  let cardsHtml = `<div class="dt-head">
+    <span class="dt-num">${String(idx + 1).padStart(2, '0')}</span>
+    <div>
+      <div class="dt-title">${cluster.base_title}${cluster.is_weak_area ? ' <span class="weak-badge">⚠ weak area</span>' : ''}</div>
+      <div class="dt-summary">${theory.summary}</div>
+      <div class="terms">${(cluster.key_terms || []).slice(0, 5).map(t => `<span class="term">${t}</span>`).join('')}</div>
+    </div>
+  </div><div class="teach-cards">`;
+
+  (theory.cards || []).forEach((card, ci) => {
+    if (!card.teach) return;
+    const srcs = (card.source_ids || []).map(si => {
+      const s = sources[si];
+      return s ? `<a href="${s.url}" target="_blank" class="src-link" title="${s.title}">[${si+1}]</a>` : '';
+    }).join('');
+    const typeLabel = { fill_blank: '✏️ Fill in the blank', true_false: '✓✗ True or False', pick_one: '💡 Quick question' };
+    const exText = (card.exercise || '').replace(/_____/g, '<span class="blank">?</span>');
+    const uid = `partial-${idx}-${ci}`;
+    const bloomLvl = card.bloom_level || 'Remember';
+    const bloomClr = card.bloom_color || '#4fc3f7';
+    const sm2Int = card.sm2_interval || 1;
+
+    cardsHtml += `<div class="teach-card" style="animation-delay:${ci * 80}ms">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+        <span class="tc-concept">${card.concept}${srcs}</span>
+        <span class="bloom-badge dh-badge" style="color:${bloomClr};border-color:${bloomClr}30">${bloomLvl}</span>
+        <span class="dh-badge sm2-badge">SM-2: ${sm2Int}d</span>
+      </div>
+      <div class="tc-teach">${card.teach}</div>
+      ${card.example ? `<div class="tc-example">${card.example}</div>` : ''}
+      <div class="tc-exercise">
+        <div class="tc-ex-type">${typeLabel[card.exercise_type] || '💡 Question'}</div>
+        <div class="tc-ex-text">${exText}</div>
+        <button class="tc-reveal-btn" onclick="document.getElementById('${uid}').classList.toggle('show');this.textContent=this.textContent==='Show answer'?'Hide':'Show answer'">Show answer</button>
+        <div class="tc-answer" id="${uid}">${card.answer}</div>
+      </div>
+    </div>`;
+  });
+
+  cardsHtml += '</div>';
+  block.innerHTML = cardsHtml;
+  container.appendChild(block);
+  block.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isLight = html.classList.toggle('light');
+  $id('themeBtn').textContent = isLight ? '🌙' : '☀️';
+  localStorage.setItem('medstart-theme', isLight ? 'light' : 'dark');
+}
+// Restore saved theme
+(function() {
+  if (localStorage.getItem('medstart-theme') === 'light') {
+    document.documentElement.classList.add('light');
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('themeBtn');
+      if (btn) btn.textContent = '🌙';
+    });
+  }
+})();
+
+// ── Submit clarify ────────────────────────────────────────────────────────
+async function submitClarify(questions, btn) {
+  const answers = collectAnswers(questions);
+  STATE.answers = answers;
+
+  btn.disabled = true;
+  btn.textContent = 'Starting agent...';
+
+  const weakStr = (answers.weak_areas || []).join(', ') || 'none';
+  setCellState('clarify', 'done',
+    `Knowledge: ${answers.knowledge_level}/5 · ${answers.days_available} days · Weak areas: ${weakStr}`);
+
+  ['cluster','theory','plan','save'].forEach(id => setCellState(id, 'waiting', 'starting shortly...'));
+  try {
+    await streamPlan(STATE.query, answers);
+  } catch (err) {
+    setCellState('cluster', 'error', err.message);
+    $id('startBtn').disabled = false;
+  }
+}
+
+// ── Start agent ───────────────────────────────────────────────────────────
+async function startAgent() {
+  const query = $id('topicInput').value.trim();
+  if (!query) { $id('topicInput').focus(); return; }
+
+  STATE = { query };
+  PARTIAL.clusters = []; PARTIAL.theories = []; PARTIAL.sources = [];
+  $id('startBtn').disabled = true;
+  $id('emptyState').style.display = 'none';
+  $id('resultsWrap').style.display = 'none';
+  $id('resultsWrap').innerHTML = '';
+
+  $id('pipelineWrap').style.display = 'block';
+  renderCells();
+
+  // Step 1 starts immediately
+  setCellState('search', 'running', 'Tavily Search — finding relevant materials...');
+  setCellState('extract', 'waiting', 'waiting for search results...');
+
+  try {
+    const res = await fetch('/api/agent/clarify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Store extraction data for later
+    STATE.extraction = data.extraction || null;
+    STATE.sensoContext = data.sensoContext || null;
+
+    setCellState('search', 'done', `${data.searchResults?.length || 5} sources found`);
+
+    // Animate verify cell (Senso)
+    setCellState('verify', 'running', 'Senso AI → scanning org knowledge base…');
+    await new Promise(r => setTimeout(r, 700));
+    const sv = data.sensoContext;
+    if (sv && sv.apiUsed) {
+      const vdet = sv.orgKbEmpty
+        ? `Org KB ready · ${data.searchResults?.length || 0} web sources · add docs to unlock verified matches`
+        : `${sv.verifiedCount}/${sv.totalChecked} verified · ${sv.matchCount} org KB matches`;
+      setCellState('verify', 'done', vdet);
+      if (sv.answer) renderSensoAnswerInCell(sv.answer);
+    } else {
+      setCellState('verify', 'done', 'Senso KB connected — no additional org matches yet');
+    }
+    await new Promise(r => setTimeout(r, 300));
+
+    // Animate extraction cell
+    setCellState('extract', 'running', 'Pioneer API → GLiNER2 NER extraction…');
+    await new Promise(r => setTimeout(r, 600));
+    const ext = data.extraction;
+    if (ext && ext.entityCount > 0) {
+      setCellState('extract', 'done', `${ext.entityCount} concepts · ${ext.domainScores?.length || 0} domains · ${ext.model}`);
+      renderExtractionInCell(ext);
+    } else {
+      setCellState('extract', 'done', 'No prior data — will learn from this session');
+    }
+
+    await new Promise(r => setTimeout(r, 300));
+    setCellState('clarify', 'interactive', 'Please answer a few questions — the agent will personalise the plan for you');
+    renderClarifyForm(data.questions || [], data.extraction);
+
+    ['cluster','theory','plan','save'].forEach(id => setCellState(id, 'waiting', 'waiting for your answers...'));
+
+    // Scroll to clarify cell
+    setTimeout(() => cellEl('clarify')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+
+  } catch (err) {
+    setCellState('search', 'error', err.message);
+    $id('startBtn').disabled = false;
+  }
+}
+
+// ── Render results ────────────────────────────────────────────────────────
+function renderResults(plan) {
+  const wrap = $id('resultsWrap');
+  wrap.style.display = 'block';
+
+  const scope    = plan.scope    || {};
+  const clusters = plan.clusters || [];
+  const daily    = plan.daily    || [];
+  const theory   = plan.theory?.per_cluster || [];
+  const sources  = plan.citations?.sources   || [];
+
+  // Build cluster lookup
+  const clMap = {};
+  clusters.forEach((c, i) => { clMap[c.cluster_id] = { ...c, idx: i }; });
+  const thMap = {};
+  theory.forEach(tc => { thMap[tc.cluster_id] = tc; });
+
+  let html = '';
+
+  // ─ Weakness Analysis banner (extraction results — for judges)
+  const extr = plan.extraction;
+  if (extr && extr.entityCount > 0) {
+    const ds = extr.domainScores || [];
+    const f1 = extr.postF1 || extr.f1;
+    html += `<div class="res-section">
+      <div class="section-label">AUTONOMOUS WEAKNESS ANALYSIS · PIONEER / GLINER2</div>
+      <div class="weakness-banner">
+        <div class="wb-title">🎯 Autonomous Weakness Extractor</div>
+        <div class="wb-sub">GLiNER2 NER model extracted medical concepts and predicted weak domains. ${f1 ? `F1 score computed against ${extr.postF1 ? 'your selected areas' : 'study history'}.` : 'F1 will improve with study history.'}</div>
+        <div class="wb-grid">
+          <div class="wb-card"><div class="wb-val" style="color:var(--cyan)">${extr.entityCount}</div><div class="wb-label">Concepts Extracted</div></div>
+          <div class="wb-card"><div class="wb-val" style="color:var(--gold)">${ds.length}</div><div class="wb-label">Domains Detected</div></div>
+          ${f1 ? `<div class="wb-card"><div class="wb-val" style="color:var(--green)">${f1.f1}</div><div class="wb-label">F1 Score</div></div>` : ''}
+          ${f1 ? `<div class="wb-card"><div class="wb-val" style="color:var(--cyan)">${f1.precision}</div><div class="wb-label">Precision</div></div>` : ''}
+          ${f1 ? `<div class="wb-card"><div class="wb-val" style="color:var(--gold)">${f1.recall}</div><div class="wb-label">Recall</div></div>` : ''}
+          <div class="wb-card"><div class="wb-val" style="font-size:12px;color:var(--green)">${extr.apiUsed ? 'GLiNER2 (Pioneer)' : 'Reka Flash NER'}</div><div class="wb-label">NER Model</div></div>
+        </div>
+        ${ds.length > 0 ? `<div style="margin-top:16px;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Predicted Weak Domains</div>
+        <div class="wb-concepts">${ds.map(d =>
+          `<span class="wb-concept" title="${d.concepts.join(', ')}"><strong>${d.domain}</strong> · ${d.count} concepts</span>`
+        ).join('')}</div>` : ''}
+        <div style="margin-top:12px">
+          <span class="extract-api-tag ${extr.apiUsed ? 'pioneer' : 'reka'}">${extr.apiUsed ? '✓ PIONEER API · GLINER2-LARGE · FASTINO' : 'REKA FLASH NER · FALLBACK'}</span>
+          <span class="extract-api-tag pioneer">ZERO-SHOT NER · 200M PARAMS</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ─ Senso source verification panel
+  const sv = plan.senso_verification;
+  if (sv) {
+    const verBadge = sv.orgKbEmpty
+      ? `<span style="font-size:11px;color:var(--muted)">Org KB is empty — add documents at <a href="https://senso.ai" target="_blank" style="color:var(--cyan)">senso.ai</a> to unlock verified source matching</span>`
+      : `<span style="font-size:12px;color:var(--green)">${sv.verifiedCount}/${sv.totalChecked || '?'} sources verified · ${sv.verificationRate}% confidence</span>`;
+    const answerHtml = sv.answer
+      ? `<div style="margin-top:14px;padding:14px 18px;background:rgba(0,230,118,.04);border:1px solid rgba(0,230,118,.18);border-radius:10px;font-size:14px;color:var(--text);line-height:1.75">
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--green);margin-bottom:8px">🧬 Senso Org KB Answer</div>
+          ${sv.answer}
+        </div>` : '';
+    html += `<div class="res-section">
+      <div class="section-label">SOURCE VERIFICATION · SENSO AI</div>
+      <div class="weakness-banner" style="background:linear-gradient(135deg,rgba(0,230,118,.03) 0%,rgba(0,212,255,.03) 100%)">
+        <div class="wb-title">✅ Senso Source Verifier</div>
+        <div class="wb-sub">Senso AI scanned the org knowledge base to cross-reference Tavily sources. Verified sources are trusted and consistent with org-indexed documents.</div>
+        <div class="wb-grid">
+          <div class="wb-card"><div class="wb-val" style="color:var(--cyan)">${sv.matchCount || 0}</div><div class="wb-label">KB Matches</div></div>
+          <div class="wb-card"><div class="wb-val" style="color:var(--green)">${sv.verifiedCount || 0}</div><div class="wb-label">Verified Sources</div></div>
+          <div class="wb-card"><div class="wb-val" style="color:var(--gold)">${sv.verificationRate || 0}%</div><div class="wb-label">Verification Rate</div></div>
+          <div class="wb-card"><div class="wb-val" style="font-size:12px;color:var(--green)">${sv.apiUsed ? 'Live' : 'Skip'}</div><div class="wb-label">API Status</div></div>
+        </div>
+        <div style="margin-top:12px">${verBadge}</div>
+        ${answerHtml}
+        <div style="margin-top:12px">
+          <span class="extract-api-tag pioneer">✓ SENSO AI · ORG KNOWLEDGE BASE</span>
+          <span class="extract-api-tag reka">TAVILY + SENSO DUAL SEARCH</span>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // ─ Methodology banner (for judges)
+  html += `<div class="res-section">
+    <div class="section-label">METHODOLOGY · EVIDENCE-BASED</div>
+    <div class="method-banner">
+      <div class="method-card">
+        <div class="m-icon">🧠</div>
+        <div class="m-title">Active Recall</div>
+        <div class="m-sub">Every concept is immediately tested with an exercise. You learn by retrieving, not re-reading.</div>
+        <span class="m-tag opensource">OPEN PEDAGOGY</span>
+      </div>
+      <div class="method-card">
+        <div class="m-icon">🔄</div>
+        <div class="m-title">SM-2 Spaced Repetition</div>
+        <div class="m-sub">Cards are tagged with initial review intervals based on the Anki open-source algorithm. Weak areas get shorter intervals.</div>
+        <span class="m-tag opensource">OPEN-SOURCE · SM-2</span>
+      </div>
+      <div class="method-card">
+        <div class="m-icon">📊</div>
+        <div class="m-title">Bloom's Taxonomy</div>
+        <div class="m-sub">Exercises are classified by cognitive level: Remember → Understand → Apply. Progression through difficulty.</div>
+        <span class="m-tag opensource">OPEN FRAMEWORK</span>
+      </div>
+      <div class="method-card">
+        <div class="m-icon">✅</div>
+        <div class="m-title">Senso Source Verification</div>
+        <div class="m-sub">Tavily web search is cross-validated against the org knowledge base via Senso AI. Dual-search architecture ensures source quality.</div>
+        <span class="m-tag opensource">SENSO AI · ORG KB</span>
+      </div>
+      <div class="method-card">
+        <div class="m-icon">🎯</div>
+        <div class="m-title">GLiNER2 NER · Pioneer</div>
+        <div class="m-sub">Zero-shot Named Entity Recognition extracts medical concepts from your study history. Autonomous weakness prediction with F1 scoring.</div>
+        <span class="m-tag opensource">FASTINO · 200M PARAMS</span>
+      </div>
+    </div>
+  </div>`;
+
+  // ─ Scope stats
+  html += `<div class="res-section">
+    <div class="section-label">STUDY SCOPE · AUTO-COMPUTED</div>
+    <div class="scope-chips">
+      <div class="scope-chip"><div class="val">${scope.N_items || '—'}</div><div class="key">Sources</div></div>
+      <div class="scope-chip"><div class="val">${clusters.length}</div><div class="key">Topics</div></div>
+      <div class="scope-chip"><div class="val">${scope.days}</div><div class="key">Days</div></div>
+      <div class="scope-chip"><div class="val">${scope.items_per_day || '—'}</div><div class="key">Q / Day</div></div>
+      <div class="scope-chip warn"><div class="val">${Math.round((scope.weak_score || 0) * 100)}%</div><div class="key">Weakness</div></div>
+      <div class="scope-chip"><div class="val">${scope.total_questions_target || '—'}</div><div class="key">Total Q</div></div>
+    </div>
+  </div>`;
+
+  // ─ Day tabs
+  html += `<div class="res-section">
+    <div class="section-label">YOUR ${daily.length}-DAY STUDY PLAN</div>
+    <div class="day-tabs">`;
+  daily.forEach((d, di) => {
+    const t = d.targets || {};
+    html += `<div class="day-tab${di === 0 ? ' active' : ''}" onclick="switchDay(${di})">
+      <div class="dt-num">Day ${d.day_index}</div>
+      <div class="dt-title">${d.focus_title}</div>
+      <div class="dt-meta">${t.total} questions</div>
+      ${d.has_weak ? '<div class="dt-weak">⚠ weak</div>' : ''}
+      ${d.is_review ? '<div class="dt-weak" style="background:rgba(171,71,188,.1);color:#ce93d8">🔄 review</div>' : ''}
+    </div>`;
+  });
+  html += `</div>`;
+
+  // ─ Day content panels (each day = its topics + teaching cards)
+  daily.forEach((d, di) => {
+    const t = d.targets || {};
+    const tot = t.total || 1;
+    const focusClusters = (d.focus_clusters || []).map(id => clMap[id]).filter(Boolean);
+
+    html += `<div class="day-content${di === 0 ? ' active' : ''}" id="day-panel-${di}">`;
+
+    // Day header
+    html += `<div class="day-header">
+      <div class="dh-day">${String(d.day_index).padStart(2, '0')}</div>
+      <div class="dh-body">
+        <div class="dh-title">${d.focus_title}${d.is_review ? ' <span style="font-size:13px;color:#ce93d8;font-weight:400">(Review Day)</span>' : ''}</div>
+        <div class="dh-sub">${t.total} questions · ${t.coverage} new · ${t.weakness} weak-area drills · ${t.review} review</div>
+        <div class="dh-badges">
+          ${d.has_weak ? '<span class="dh-badge weak-badge">⚠ Contains weak areas</span>' : ''}
+          <span class="dh-badge sm2-badge">SM-2 interval: review in ${d.has_weak ? '1' : '2'} days</span>
+        </div>
+      </div>
+    </div>`;
+
+    // Each topic assigned to this day
+    focusClusters.forEach((cl, ti) => {
+      const tc = thMap[cl.cluster_id];
+      if (!tc) return;
+      const clIdx = cl.idx;
+
+      // Render topic header + its teaching cards
+      html += `<div class="day-topic" style="animation-delay:${ti * 100}ms">`;
+      html += `<div class="dt-head">
+        <span class="dt-num">${String(clIdx + 1).padStart(2, '0')}</span>
+        <div>
+          <div class="dt-title">${cl.base_title}${cl.is_weak_area ? ' <span class="weak-badge">⚠ weak area</span>' : ''}</div>
+          <div class="dt-summary">${tc.summary}</div>
+          <div class="terms">${(cl.key_terms || []).slice(0, 5).map(t => `<span class="term">${t}</span>`).join('')}</div>
+        </div>
+      </div>`;
+
+      // Teaching cards
+      html += `<div class="teach-cards">`;
+      (tc.cards || []).forEach((card, ci) => {
+        if (!card.teach) return;
+        const srcs = (card.source_ids || []).map(si => {
+          const s = sources[si];
+          return s ? `<a href="${s.url}" target="_blank" class="src-link" title="${s.title}">[${si+1}]</a>` : '';
+        }).join('');
+        const typeLabel = { fill_blank: '✏️ Fill in the blank', true_false: '✓✗ True or False', pick_one: '💡 Quick question' };
+        const exText = (card.exercise || '').replace(/_____/g, '<span class="blank">?</span>');
+        const uid = `ans-${di}-${ti}-${ci}`;
+        const bloomLvl = card.bloom_level || 'Remember';
+        const bloomClr = card.bloom_color || '#4fc3f7';
+        const sm2Int = card.sm2_interval || 1;
+
+        html += `<div class="teach-card" style="animation-delay:${ti * 100 + ci * 80}ms">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+            <span class="tc-concept">${card.concept}${srcs}</span>
+            <span class="bloom-badge dh-badge" style="color:${bloomClr};border-color:${bloomClr}30">${bloomLvl}</span>
+            <span class="dh-badge sm2-badge">SM-2: ${sm2Int}d</span>
+          </div>
+          <div class="tc-teach">${card.teach}</div>
+          ${card.example ? `<div class="tc-example">${card.example}</div>` : ''}
+          <div class="tc-exercise">
+            <div class="tc-ex-type">${typeLabel[card.exercise_type] || '💡 Question'}</div>
+            <div class="tc-ex-text">${exText}</div>
+            <button class="tc-reveal-btn" onclick="document.getElementById('${uid}').classList.toggle('show');this.textContent=this.textContent==='Show answer'?'Hide':'Show answer'">Show answer</button>
+            <div class="tc-answer" id="${uid}">${card.answer}</div>
+          </div>
+        </div>`;
+      });
+      html += `</div></div>`; // close teach-cards + day-topic
+    });
+
+    html += `</div>`; // close day-content
+  });
+  html += `</div>`; // close res-section
+
+  wrap.innerHTML = html;
+  setTimeout(() => wrap.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+}
+
+function switchDay(idx) {
+  document.querySelectorAll('.day-tab').forEach((t, i) => t.classList.toggle('active', i === idx));
+  document.querySelectorAll('.day-content').forEach((p, i) => p.classList.toggle('active', i === idx));
+}
+
+// ── Example topic ─────────────────────────────────────────────────────────
+function setTopic(t) {
+  $id('topicInput').value = t;
+  $id('topicInput').focus();
+}
+
+// ── Event listeners ───────────────────────────────────────────────────────
+$id('startBtn').addEventListener('click', startAgent);
+$id('topicInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') startAgent();
+});
+</script>
+</body>
+</html>

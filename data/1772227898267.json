@@ -1,0 +1,28 @@
+{
+  "query": "DNA RNA protein synthesis medical school entrance exam biology",
+  "plan": {
+    "topic": "DNA RNA protein synthesis medical school entrance exam biology",
+    "generatedAt": "2026-02-27T21:31:38.267Z",
+    "autonomyLevel": "multi-step reasoning",
+    "phases": [
+      {
+        "phase": 1,
+        "goal": "Understand fundamentals",
+        "focus": "DNA RNA protein synthesis medical school entrance exam biology",
+        "resource": "https://www.brainscape.com/flashcards/dna-and-protein-synthesis-8592370/packs/15958959"
+      },
+      {
+        "phase": 2,
+        "goal": "Break into subtopic",
+        "focus": "DNA RNA protein synthesis medical",
+        "resource": "https://studymind.co.uk/notes/synthesising-proteins-from-dna/"
+      },
+      {
+        "phase": 3,
+        "goal": "Apply and test knowledge",
+        "focus": "medical school entrance exam biology",
+        "resource": "https://www.mchip.net/fetch.php/u3G59C/244036/Biology%20Rna%20And%20Protein%20Synthesis%20Test%20Answers.pdf"
+      }
+    ]
+  }
+}
